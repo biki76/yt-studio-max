@@ -8,19 +8,16 @@ export function AdBanner({ type }: AdBannerProps) {
   const adRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // In a real environment, we would inject the Adsterra script tag.
-    // For React SPA, we usually append the script dynamically if needed.
-    // E.g.,
-    /*
+    
     const script = document.createElement("script");
-    script.src = "//www.topcreativeformat.com/YOUR_ID/invoke.js";
+    script.src = "https://www.highperformanceformat.com/8a1e953718286fee6f5c906d6581bf1f/invoke.js";
     script.async = true;
     script.setAttribute("data-cfasync", "false");
     if (adRef.current) {
         adRef.current.innerHTML = "";
         adRef.current.appendChild(script);
     }
-    */
+    
   }, [type]);
 
   const dimensions = type === '728x90' ? 'w-[728px] h-[90px]' : 'w-[300px] h-[250px]';
