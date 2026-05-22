@@ -6,23 +6,60 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Simulated YouTube fetcher
+// API Instances
+const INVIDIOUS_INSTANCES = [
+  'https://inv.thepixora.com/api/v1',
+  'https://invidious.jing.rocks/api/v1',
+  'https://invidious.nerdvpn.de/api/v1',
+  'https://invidious.incogniweb.net/api/v1'
+];
+
+async function fetchWithFallback(path: string) {
+  let lastErr;
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${instance}${path}`, { signal: controller.signal });
+      clearTimeout(id);
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+  throw lastErr;
+}
+
 export async function searchYouTube(query: string): Promise<any[]> {
-  // Mock delay
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  
   if (!query) return [];
 
-  // Generate some mock results based on query
-  return Array.from({ length: 12 }).map((_, i) => ({
-    id: `yt-mock-${Date.now()}-${i}`,
-    title: `${query} - Result ${i + 1} | Full HD Video`,
-    thumbnail: `https://picsum.photos/seed/${query}${i}/320/180`,
-    duration: '03:45',
-    channelName: 'Test Channel',
-    // We use a small public test video URL for actual FFmpeg processing testing
-    videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm', 
-  }));
+  try {
+    const data = await fetchWithFallback(`/search?q=${encodeURIComponent(query)}`);
+    
+    return data
+      .filter((item: any) => item.type === 'video')
+      .map((item: any) => ({
+        id: item.videoId,
+        title: item.title,
+        thumbnail: item.videoThumbnails?.find((t: any) => t.quality === 'medium')?.url || item.videoThumbnails?.[0]?.url,
+        duration: formatSecondsToDuration(item.lengthSeconds),
+        channelName: item.author,
+        videoUrl: `DYNAMIC_FETCH_${item.videoId}`,
+      })).slice(0, 50);
+  } catch (err) {
+    console.error('Failed to search invidious', err);
+    // Fallback mock if API fails completely
+    return Array.from({ length: 4 }).map((_, i) => ({
+      id: `yt-mock-${Date.now()}-${i}`,
+      title: `${query} - API Error Fallback ${i + 1}`,
+      thumbnail: `https://picsum.photos/seed/${query}${i}/320/180`,
+      duration: '03:45',
+      channelName: 'Network Error',
+      videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm', 
+    }));
+  }
 }
 
 export function parseDurationToSeconds(duration: string): number {
@@ -73,4 +110,66 @@ export function estimateSize(totalSeconds: number, format: Format, quality: Qual
    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
    const i = Math.floor(Math.log(bytes) / Math.log(k));
    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+export async function getTrendingVideos() {
+  try {
+    const data = await fetchWithFallback(`/trending`);
+    
+    return data
+      .filter((item: any) => item.type === 'video')
+      .map((item: any) => ({
+        id: item.videoId,
+        title: item.title,
+        thumbnail: item.videoThumbnails?.find((t: any) => t.quality === 'medium')?.url || item.videoThumbnails?.[0]?.url,
+        duration: formatSecondsToDuration(item.lengthSeconds),
+        channelName: item.author,
+        videoUrl: `DYNAMIC_FETCH_${item.videoId}`,
+      })).slice(0, 50);
+  } catch (err) {
+    console.error('Failed to fetch trending from invidious', err);
+    return [];
+  }
+}
+
+export function playNotificationFeedback() {
+  // Haptic feedback (if supported)
+  if ('vibrate' in navigator) {
+    // Two short pulses
+    navigator.vibrate([100, 50, 100]);
+  }
+
+  // Subtle audio notification using Web Audio API
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContext) {
+      const audioCtx = new AudioContext();
+      
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      // Gentle sine wave or triangle wave
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // Slide up to A5
+      
+      // Envelope to make it sound like a soft ping
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05); // Attack
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3); // Decay
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.3);
+      
+      // Cleanup to avoid memory leaks
+      setTimeout(() => {
+        audioCtx.close().catch(console.error);
+      }, 500);
+    }
+  } catch (e) {
+    console.warn("Audio notification failed:", e);
+  }
 }

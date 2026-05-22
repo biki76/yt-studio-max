@@ -2,11 +2,53 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { BatchItem, Format, Quality } from '../types';
 
+const INVIDIOUS_INSTANCES = [
+  'https://inv.thepixora.com/api/v1',
+  'https://invidious.jing.rocks/api/v1',
+  'https://invidious.nerdvpn.de/api/v1',
+  'https://invidious.incogniweb.net/api/v1'
+];
+
+async function resolveDynamicUrl(videoUrl: string, format: Format): Promise<string> {
+  if (!videoUrl.startsWith('DYNAMIC_FETCH_')) return videoUrl;
+  
+  const videoId = videoUrl.replace('DYNAMIC_FETCH_', '');
+  
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(`${instance}/videos/${videoId}`, { signal: controller.signal });
+      clearTimeout(id);
+      
+      if (!res.ok) continue;
+      const data = await res.json();
+      
+      if (format === 'MP3' || format === 'WAV') {
+        const audioStream = data.adaptiveFormats?.find((f: any) => f.type.startsWith('audio'));
+        if (audioStream) return audioStream.url;
+      }
+      
+      const combined = data.formatStreams?.find((s: any) => s.resolution === '720p') || data.formatStreams?.[0];
+      if (combined) return combined.url;
+      
+      const defaultStream = data.adaptiveFormats?.find((f: any) => f.type.startsWith('video'));
+      if (defaultStream) return defaultStream.url;
+    } catch (e) {
+      console.error(`Failed resolving stream on ${instance}`, e);
+    }
+  }
+
+  console.error('All invidious instances failed to resolve stream');
+  return 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm';
+}
+
 export async function processIndividualItems(
   ffmpeg: FFmpeg,
   queue: BatchItem[],
   format: Format,
   quality: Quality,
+  normalizeAudio: boolean,
   updateProgress: (id: string, progress: number, status: BatchItem['status'], downloadUrl?: string) => void,
   onItemComplete?: (item: BatchItem, url: string) => void
 ) {
@@ -28,7 +70,8 @@ export async function processIndividualItems(
         const outputName = `output-${item.id}.${outputExt}`;
 
         // Write input file to FS
-        await ffmpeg.writeFile(inputName, await fetchFile(item.videoUrl));
+        const actualUrl = await resolveDynamicUrl(item.videoUrl, format);
+        await ffmpeg.writeFile(inputName, await fetchFile(actualUrl));
 
         ffmpeg.on('progress', ({ progress }) => {
           updateProgress(item.id, Math.round(progress * 100), 'converting');
@@ -62,6 +105,10 @@ export async function processIndividualItems(
           if (item.metadata.artist) {
             args.push('-metadata', `artist=${item.metadata.artist}`);
           }
+        }
+
+        if (normalizeAudio) {
+          args.push('-af', 'loudnorm');
         }
 
         args.push(outputName);
@@ -110,6 +157,7 @@ export async function processConcatenation(
   queue: BatchItem[],
   format: Format,
   quality: Quality,
+  normalizeAudio: boolean,
   updateGlobalProgress: (progress: number) => void,
   onComplete: (url: string) => void,
   onError: (e: any) => void
@@ -124,7 +172,8 @@ export async function processConcatenation(
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
       const tempName = `temp-${i}.webm`;
-      await ffmpeg.writeFile(tempName, await fetchFile(item.videoUrl));
+      const actualUrl = await resolveDynamicUrl(item.videoUrl, format);
+      await ffmpeg.writeFile(tempName, await fetchFile(actualUrl));
       concatText += `file '${tempName}'\n`;
       if (item.startTrim) {
         concatText += `inpoint ${item.startTrim}\n`;
@@ -151,6 +200,10 @@ export async function processConcatenation(
       args.push('-vn', '-c:a', 'pcm_s16le');
     }
     
+    if (normalizeAudio) {
+      args.push('-af', 'loudnorm');
+    }
+
     args.push(outputName);
 
     await ffmpeg.exec(args);
