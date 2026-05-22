@@ -18,6 +18,10 @@ interface AppContextType {
   setQuality: (q: Quality) => void;
   theme: 'deep-space' | 'midnight-indigo' | 'minimalist-light';
   setTheme: (t: 'deep-space' | 'midnight-indigo' | 'minimalist-light') => void;
+  normalizeAudio: boolean;
+  setNormalizeAudio: (n: boolean) => void;
+  soundEnabled: boolean;
+  setSoundEnabled: (s: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -40,6 +44,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [format, setFormat] = useState<Format>('MP4');
   const [quality, setQuality] = useState<Quality>('Medium');
+  const [normalizeAudio, setNormalizeAudio] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ytsm_normalize');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return false;
+  });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ytsm_sound');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return true;
+  });
   const [theme, setTheme] = useState<'deep-space' | 'midnight-indigo' | 'minimalist-light'>(() => {
     try {
       const saved = localStorage.getItem('ytsm_theme');
@@ -55,6 +73,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('ytsm_batch', JSON.stringify(batchQueue));
   }, [batchQueue]);
+
+  useEffect(() => {
+    localStorage.setItem('ytsm_normalize', JSON.stringify(normalizeAudio));
+  }, [normalizeAudio]);
+
+  useEffect(() => {
+    localStorage.setItem('ytsm_sound', JSON.stringify(soundEnabled));
+  }, [soundEnabled]);
 
   useEffect(() => {
     localStorage.setItem('ytsm_theme', theme);
@@ -116,6 +142,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setFormat,
         quality,
         setQuality,
+        normalizeAudio,
+        setNormalizeAudio,
+        soundEnabled,
+        setSoundEnabled,
         theme,
         setTheme,
       }}
