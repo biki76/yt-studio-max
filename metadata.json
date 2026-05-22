@@ -1,0 +1,6 @@
+{
+  "name": "YouTube Studio Max",
+  "description": "Client-side video search, downloader, batch converter, and concatenator using FFmpeg.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
