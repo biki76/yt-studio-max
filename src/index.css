@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Theme Overrides */
+html[data-theme="midnight-indigo"] body {
+  background-color: #0c0a20 !important;
+}
+html[data-theme="midnight-indigo"] .bg-black { background-color: #0c0a20 !important; }
+html[data-theme="midnight-indigo"] .bg-slate-900 { background-color: #16133a !important; }
+html[data-theme="midnight-indigo"] .from-indigo-900\/20 { --tw-gradient-from: rgba(67, 56, 202, 0.3) !important; }
+
+html[data-theme="minimalist-light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+html[data-theme="minimalist-light"] .bg-black { background-color: #f8fafc !important; }
+html[data-theme="minimalist-light"] .bg-slate-900 { background-color: #ffffff !important; }
+html[data-theme="minimalist-light"] .text-white { color: #0f172a !important; }
+html[data-theme="minimalist-light"] .text-white\/70 { color: rgba(15,23,42,0.7) !important; }
+html[data-theme="minimalist-light"] .text-white\/50 { color: rgba(15,23,42,0.5) !important; }
+html[data-theme="minimalist-light"] .text-white\/40 { color: rgba(15,23,42,0.6) !important; } /* darker for visibility */
+html[data-theme="minimalist-light"] .text-white\/30 { color: rgba(15,23,42,0.5) !important; }
+html[data-theme="minimalist-light"] .text-white\/20 { color: rgba(15,23,42,0.3) !important; }
+html[data-theme="minimalist-light"] .bg-white\/5 { background-color: rgba(0,0,0,0.03) !important; border-color: rgba(0,0,0,0.08) !important; }
+html[data-theme="minimalist-light"] .bg-white\/10 { background-color: rgba(0,0,0,0.08) !important; }
+html[data-theme="minimalist-light"] .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
+html[data-theme="minimalist-light"] .hover\:bg-white\/20:hover { background-color: rgba(0,0,0,0.12) !important; }
+html[data-theme="minimalist-light"] .border-white\/10 { border-color: rgba(0,0,0,0.1) !important; }
+html[data-theme="minimalist-light"] .border-white\/5 { border-color: rgba(0,0,0,0.05) !important; }
+html[data-theme="minimalist-light"] .bg-slate-950 { background-color: #f8fafc !important; }
+html[data-theme="minimalist-light"] .bg-black\/50 { background-color: rgba(0,0,0,0.03) !important; }
+html[data-theme="minimalist-light"] .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2) !important; }
+html[data-theme="minimalist-light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3) !important; }
+html[data-theme="minimalist-light"] .to-black,
+html[data-theme="minimalist-light"] .via-black { --tw-gradient-to: #f8fafc; --tw-gradient-stops: var(--tw-gradient-from), #f8fafc, var(--tw-gradient-to); }
+html[data-theme="minimalist-light"] .bg-gradient-to-t.from-black { --tw-gradient-from: #f8fafc; }
+html[data-theme="minimalist-light"] .bg-gradient-to-r.from-white { --tw-gradient-from: #0f172a; --tw-gradient-to: rgba(15,23,42,0.6); }
+
+/* Ensure modal overlays retain dark backdrop even in light mode mostly */
+html[data-theme="minimalist-light"] .bg-black\/80 { background-color: rgba(255,255,255,0.8) !important; }
+
