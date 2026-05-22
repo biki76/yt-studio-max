@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X, CheckCircle2, AlertCircle, Loader2, Scissors, Music } from 'lucide-react';
+import { GripVertical, X, CheckCircle2, AlertCircle, Loader2, Scissors, Music, Clock } from 'lucide-react';
 import { BatchItem } from '../types';
 import { useAppContext } from '../store/AppContext';
-import { cn, parseDurationToSeconds, formatSecondsToDuration } from '../lib/utils';
+import { cn, parseDurationToSeconds, formatSecondsToDuration, estimateSize } from '../lib/utils';
 import { TrimModal } from './TrimModal';
 
 interface BatchQueueItemProps {
@@ -15,14 +15,16 @@ interface BatchQueueItemProps {
 }
 
 export const BatchQueueItem: React.FC<BatchQueueItemProps> = ({ item, showDragTooltip, isSelected, onToggleSelect }) => {
-  const { removeFromBatch, updateBatchItem, format } = useAppContext();
+  const { removeFromBatch, updateBatchItem, format, quality } = useAppContext();
   const [showTrimModal, setShowTrimModal] = useState(false);
   const [showMetaModal, setShowMetaModal] = useState(false);
   const [metaTitle, setMetaTitle] = useState(item.metadata?.title || '');
   const [metaArtist, setMetaArtist] = useState(item.metadata?.artist || '');
   
-  const estimatedSeconds = parseDurationToSeconds(item.duration) / 2; // rough estimate
+  const totalSeconds = parseDurationToSeconds(item.duration);
+  const estimatedSeconds = totalSeconds / 2; // rough estimate
   const estimatedTimeText = `Estimated conversion time: ${formatSecondsToDuration(estimatedSeconds)}`;
+  const estimatedFileText = item.status === 'idle' ? `~${estimateSize(totalSeconds, format, quality)}` : '';
 
   const {
     attributes,
@@ -50,22 +52,23 @@ export const BatchQueueItem: React.FC<BatchQueueItemProps> = ({ item, showDragTo
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-lg group relative",
-        isDragging && "opacity-50 border-indigo-500/50 z-10"
+        "flex items-center gap-3 p-3 bg-black/20 hover:bg-white-[0.03] border border-white/5 hover:border-white/10 rounded-xl group relative transition-colors shadow-sm",
+        isDragging && "opacity-50 border-indigo-500/50 z-10 shadow-xl scale-105 bg-black/40 backdrop-blur-md"
       )}
     >
       {showDragTooltip && !isDragging && (
-        <div className="absolute -top-[22px] left-2 bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded shadow-lg whitespace-nowrap animate-pulse pointer-events-none z-20">
+        <div className="absolute -top-[22px] left-2 bg-indigo-600 shadow-[0_0_15px_rgba(79,70,229,0.5)] text-white text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap animate-pulse pointer-events-none z-20 font-medium tracking-wide">
           Drag to reorder
-          <div className="absolute top-full left-[10px] w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-indigo-600"></div>
+          <div className="absolute top-full left-[12px] w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-indigo-600"></div>
         </div>
       )}
+      
       <div 
         {...attributes} 
         {...listeners}
-        className="cursor-grab hover:text-white/80 text-white/30 transition-colors"
+        className="cursor-grab hover:text-white/80 text-white/20 transition-colors p-1"
       >
-        <GripVertical className="w-5 h-5" />
+        <GripVertical className="w-4 h-4" />
       </div>
       
       {onToggleSelect && (
@@ -74,41 +77,56 @@ export const BatchQueueItem: React.FC<BatchQueueItemProps> = ({ item, showDragTo
             type="checkbox" 
             checked={!!isSelected} 
             onChange={onToggleSelect}
-            className="w-4 h-4 rounded border-white/20 bg-black/50 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
+            className="w-4 h-4 rounded-sm border-white/20 bg-black/50 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer transition-colors"
           />
         </div>
       )}
 
-      <img src={item.thumbnail} alt="" className="w-16 h-9 object-cover rounded bg-black/50" />
+      <div className="relative shrink-0 overflow-hidden rounded-md border border-white/10">
+        <img src={item.thumbnail} alt="" className="w-16 h-9 object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+      </div>
       
-      <div className="flex-1 min-w-0">
-        <h4 className="text-white/90 text-sm font-medium truncate">{item.title}</h4>
+      <div className="flex-1 min-w-0 pr-2">
+        <h4 className="text-white/90 text-sm font-medium truncate tracking-tight">{item.title}</h4>
         
         {/* Status indicator */}
         <div className="flex items-center mt-1">
-          {item.status === 'idle' && <span className="text-xs text-white/40">Queued</span>}
+          {item.status === 'idle' && (
+            <div className="flex items-center text-amber-400/80 text-[11px] font-bold tracking-wide uppercase">
+              <Clock className="w-3 h-3 mr-1" />
+              Queued
+            </div>
+          )}
           {item.status === 'converting' && (
-            <div className="flex items-center text-indigo-400 text-xs">
+            <div className="flex items-center text-indigo-400 text-[11px] font-bold tracking-wide uppercase">
               <Loader2 className="w-3 h-3 animate-spin mr-1" />
               {item.progress}%
             </div>
           )}
           {item.status === 'completed' && (
-            <div className="flex items-center text-emerald-400 text-xs">
+            <div className="flex items-center text-emerald-400 text-[11px] font-bold tracking-wide uppercase">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               Done
             </div>
           )}
           {item.status === 'error' && (
-            <div className="flex items-center text-rose-400 text-xs">
+            <div className="flex items-center text-rose-400 text-[11px] font-bold tracking-wide uppercase">
               <AlertCircle className="w-3 h-3 mr-1" />
               Failed
             </div>
           )}
+          {item.status === 'idle' && (
+            <>
+              <span className="mx-2 text-white/20">•</span>
+              <span className="text-[10px] text-white/40 font-mono tracking-wider" title={`Estimated size: ${estimatedFileText}`}>
+                {estimatedFileText}
+              </span>
+            </>
+          )}
         </div>
       </div>
       
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         {item.status === 'idle' && isAudioFormat && (
           <button 
             onClick={() => setShowMetaModal(true)}
@@ -156,14 +174,21 @@ export const BatchQueueItem: React.FC<BatchQueueItemProps> = ({ item, showDragTo
       {/* Persistent Progress Bar */}
       <div 
         className={cn(
-          "absolute bottom-0 left-0 h-0.5 rounded-bl-lg transition-all duration-300",
+          "absolute bottom-0 left-0 h-0.5 rounded-bl-lg transition-all duration-500 ease-out overflow-hidden",
           item.status === 'idle' ? "bg-white/10 group-hover:bg-white/20" : 
-          item.status === 'converting' ? "bg-indigo-500" :
-          item.status === 'completed' ? "bg-emerald-500" : "bg-rose-500"
+          item.status === 'converting' ? "bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.5)]" :
+          item.status === 'completed' ? "bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" : "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.5)]"
         )}
-        style={{ width: item.status === 'idle' || item.status === 'error' ? '100%' : `${item.progress || 100}%` }}
+        style={{ 
+          width: item.status === 'idle' || item.status === 'error' ? '100%' : `${item.progress || 100}%`,
+          transitionProperty: 'width, background-color, box-shadow' 
+        }}
         title={item.status === 'idle' ? estimatedTimeText : undefined}
-      />
+      >
+        {item.status === 'converting' && (
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent w-full -translate-x-full animate-[shimmer_1.5s_infinite]" />
+        )}
+      </div>
 
       {showTrimModal && (
         <TrimModal 

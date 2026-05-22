@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Settings2, Settings, Download, Layers, Trash2, ListMinus, Loader2, Clock, HardDrive, History, FileVideo, Upload, Save, Search, Shuffle, FilterX, Scissors, Info } from 'lucide-react';
+import { Settings2, Settings, Download, Layers, Trash2, ListMinus, Loader2, Clock, HardDrive, History, FileVideo, Upload, Save, Search, Shuffle, FilterX, Scissors, Info, ChevronDown } from 'lucide-react';
 import { 
   DndContext, 
   closestCenter,
@@ -20,14 +20,14 @@ import { BatchQueueItem } from './BatchQueueItem';
 import { AdBanner } from './AdBanner';
 import { processIndividualItems, processConcatenation } from '../lib/ffmpegUtils';
 import { useFFmpeg } from '../hooks/useFFmpeg';
-import { cn, parseDurationToSeconds, formatSecondsToDuration, estimateSize, guessFormatFromQuality } from '../lib/utils';
+import { cn, parseDurationToSeconds, formatSecondsToDuration, estimateSize, guessFormatFromQuality, playNotificationFeedback } from '../lib/utils';
 import { Format, Quality } from '../types';
 import { useToast } from './ToastProvider';
 
 import { BulkTrimModal } from './BulkTrimModal';
 
 export function BatchQueueSidebar() {
-  const { batchQueue, setBatchQueue, clearBatch, format, setFormat, quality, setQuality, history, addToHistory, clearHistory } = useAppContext();
+  const { batchQueue, setBatchQueue, clearBatch, format, setFormat, quality, setQuality, normalizeAudio, setNormalizeAudio, soundEnabled, setSoundEnabled, history, addToHistory, clearHistory } = useAppContext();
   const { ffmpeg, loaded, loadingError } = useFFmpeg();
   const { addToast } = useToast();
   
@@ -43,7 +43,41 @@ export function BatchQueueSidebar() {
   const [showLogs, setShowLogs] = useState(false);
   const [globalProgress, setGlobalProgress] = useState(-1); // -1 means idle
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [statsExpanded, setStatsExpanded] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (window.innerWidth < 1024 && batchQueue.length > 2) {
+      setStatsExpanded(false);
+    }
+  }, [batchQueue.length]);
+
+  const exportHistoryCSV = () => {
+    if (history.length === 0) return;
+    
+    const headers = ['Title', 'Duration', 'Format', 'Quality', 'Date', 'Status'];
+    const rows = history.map(item => [
+      `"${item.title.replace(/"/g, '""')}"`,
+      item.duration || 'N/A',
+      item.format || 'Unknown',
+      item.quality || 'N/A',
+      new Date(item.completedAt).toLocaleString(),
+      'Completed'
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `processing_history_${new Date().toISOString().slice(0,10)}.csv`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (!ffmpeg) return;
@@ -243,7 +277,7 @@ export function BatchQueueSidebar() {
       ));
     };
 
-    await processIndividualItems(ffmpeg, batchQueue, format, quality, updateProgress, (item, url) => {
+    await processIndividualItems(ffmpeg, batchQueue, format, quality, normalizeAudio, updateProgress, (item, url) => {
       addToHistory({
         id: `hist-${Date.now()}-${item.id}`,
         title: item.title,
@@ -256,6 +290,11 @@ export function BatchQueueSidebar() {
     });
     setIsProcessing(false);
     setProcessingStart(null);
+    
+    if (soundEnabled) {
+      playNotificationFeedback();
+    }
+    
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Batch processing complete!', {
         body: `Processed ${batchQueue.length} items.`,
@@ -275,6 +314,7 @@ export function BatchQueueSidebar() {
       batchQueue, 
       format, 
       quality, 
+      normalizeAudio,
       setGlobalProgress, 
       (url) => { 
         console.log('Merged ready', url); 
@@ -293,6 +333,10 @@ export function BatchQueueSidebar() {
     setIsProcessing(false);
     setProcessingStart(null);
     setGlobalProgress(-1);
+    
+    if (soundEnabled) {
+      playNotificationFeedback();
+    }
     
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Merge complete!', {
@@ -327,10 +371,10 @@ export function BatchQueueSidebar() {
       initial={false}
       animate={{
         boxShadow: isProcessing ? ['inset 0 0 0px rgba(99, 102, 241, 0)', 'inset 0 0 40px rgba(99, 102, 241, 0.15)', 'inset 0 0 0px rgba(99, 102, 241, 0)'] : 'inset 0 0 0px rgba(99, 102, 241, 0)',
-        borderColor: isProcessing ? ['rgba(255, 255, 255, 0.1)', 'rgba(99, 102, 241, 0.5)', 'rgba(255, 255, 255, 0.1)'] : 'rgba(255, 255, 255, 0.1)'
+        borderColor: isProcessing ? ['rgba(255, 255, 255, 0.1)', 'rgba(99, 102, 241, 0.5)', 'rgba(255, 255, 255, 0.1)'] : 'rgba(255, 255, 255, 0.05)'
       }}
       transition={isProcessing ? { duration: 2.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
-      className="w-full lg:w-96 flex flex-col h-full bg-slate-900/50 backdrop-blur-xl shrink-0 border-l"
+      className="w-full lg:w-[420px] xl:w-[480px] flex flex-col h-full bg-black/60 backdrop-blur-2xl shrink-0 border-l shadow-2xl relative z-20"
     >
       
       {/* Tabs / Header */}
@@ -413,7 +457,11 @@ export function BatchQueueSidebar() {
                  </button>
                  {selectedIds.size > 0 ? (
                    <button 
-                     onClick={handleDeleteSelected}
+                     onClick={() => {
+                       if (window.confirm(`Are you sure you want to delete ${selectedIds.size} selected items?`)) {
+                         handleDeleteSelected();
+                       }
+                     }}
                      disabled={isProcessing}
                      className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded transition-colors disabled:opacity-50"
                      title={`Delete ${selectedIds.size} Selected`}
@@ -422,7 +470,11 @@ export function BatchQueueSidebar() {
                    </button>
                  ) : (
                    <button 
-                     onClick={clearBatch}
+                     onClick={() => {
+                       if (window.confirm("Are you sure you want to clear the entire queue?")) {
+                         clearBatch();
+                       }
+                     }}
                      disabled={isProcessing}
                      className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors disabled:opacity-50"
                      title="Clear Queue"
@@ -435,13 +487,26 @@ export function BatchQueueSidebar() {
            </div>
         )}
         {activeTab === 'history' && history.length > 0 && (
-          <button 
-            onClick={clearHistory}
-            className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-colors"
-            title="Clear History"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={exportHistoryCSV}
+              className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-colors"
+              title="Export History to CSV"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => {
+                if (window.confirm("Are you sure you want to clear your download history?")) {
+                  clearHistory();
+                }
+              }}
+              className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-colors"
+              title="Clear History"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -542,15 +607,73 @@ export function BatchQueueSidebar() {
             </button>
           ))}
         </div>
+
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs font-medium text-white/70">Audio Normalization</span>
+          <button
+            onClick={() => setNormalizeAudio(!normalizeAudio)}
+            disabled={isProcessing}
+            title="Applies the loudnorm filter to audio to normalize volume levels."
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50",
+              normalizeAudio ? "bg-indigo-500" : "bg-white/20"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                normalizeAudio ? "translate-x-4" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
+        
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs font-medium text-white/70">Sound Notification</span>
+          <button
+            onClick={() => {
+              setSoundEnabled(!soundEnabled);
+              if (!soundEnabled) {
+                // Play test sound when enabled
+                playNotificationFeedback();
+              }
+            }}
+            disabled={isProcessing}
+            title="Play a subtle sound and haptic feedback when batch processing is completed."
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50",
+              soundEnabled ? "bg-indigo-500" : "bg-white/20"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                soundEnabled ? "translate-x-4" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Summary & Stats Panel */}
       {batchQueue.length > 0 && activeTab === 'queue' && (
-        <div className="p-4 border-b border-white/10 bg-black/40 flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-wider font-semibold text-white/40">
-            <span className="col-span-2 text-[10px] text-white/30 border-b border-white/5 pb-1 mb-1">Batch Statistics</span>
-            
-            <div className="flex flex-col">
+        <div className="border-b border-white/10 bg-black/40 flex flex-col">
+          <button 
+             onClick={() => setStatsExpanded(!statsExpanded)}
+             className="w-full flex items-center justify-between p-3 text-[10px] text-white/30 hover:text-white/50 transition-colors uppercase tracking-wider font-semibold cursor-pointer"
+          >
+             <span>Batch Statistics</span>
+             <ChevronDown className={cn("w-4 h-4 transition-transform", statsExpanded ? "rotate-180" : "")} />
+          </button>
+          
+          <motion.div 
+            initial={false}
+            animate={{ height: statsExpanded ? 'auto' : 0, opacity: statsExpanded ? 1 : 0 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-wider font-semibold text-white/40">
+                <div className="flex flex-col">
               <span>Total Items</span>
               <div className="text-white/90 text-sm font-mono mt-0.5 normal-case tracking-normal">
                 {batchQueue.length}
@@ -597,6 +720,8 @@ export function BatchQueueSidebar() {
                <option value="title-desc">Title (Z-A)</option>
              </select>
           </div>
+            </div>
+          </motion.div>
         </div>
       )}
 
