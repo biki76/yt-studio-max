@@ -2,11 +2,13 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
 import { BatchItem, Format, Quality } from '../types';
 
-const INVIDIOUS_INSTANCES = [
-  'https://inv.thepixora.com/api/v1',
-  'https://invidious.jing.rocks/api/v1',
-  'https://invidious.nerdvpn.de/api/v1',
-  'https://invidious.incogniweb.net/api/v1'
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.syncpundit.io',
+  'https://pipedapi.smarthome.yt',
+  'https://pi.ggtyler.dev',
+  'https://pipedapi.in.projectsegfau.lt'
 ];
 
 async function resolveDynamicUrl(videoUrl: string, format: Format): Promise<string> {
@@ -14,32 +16,32 @@ async function resolveDynamicUrl(videoUrl: string, format: Format): Promise<stri
   
   const videoId = videoUrl.replace('DYNAMIC_FETCH_', '');
   
-  for (const instance of INVIDIOUS_INSTANCES) {
+  for (const instance of PIPED_INSTANCES) {
     try {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(`${instance}/videos/${videoId}`, { signal: controller.signal });
+      const res = await fetch(`${instance}/streams/${videoId}`, { signal: controller.signal });
       clearTimeout(id);
       
       if (!res.ok) continue;
       const data = await res.json();
       
       if (format === 'MP3' || format === 'WAV') {
-        const audioStream = data.adaptiveFormats?.find((f: any) => f.type.startsWith('audio'));
+        const audioStream = data.audioStreams?.find((f: any) => f.bitrate > 0) || data.audioStreams?.[0];
         if (audioStream) return audioStream.url;
+      } else {
+        const combined = data.videoStreams?.find((s: any) => !s.videoOnly && s.quality === '720p') 
+          || data.videoStreams?.find((s: any) => !s.videoOnly)
+          || data.videoStreams?.[0];
+        if (combined) return combined.url;
       }
       
-      const combined = data.formatStreams?.find((s: any) => s.resolution === '720p') || data.formatStreams?.[0];
-      if (combined) return combined.url;
-      
-      const defaultStream = data.adaptiveFormats?.find((f: any) => f.type.startsWith('video'));
-      if (defaultStream) return defaultStream.url;
     } catch (e) {
       console.error(`Failed resolving stream on ${instance}`, e);
     }
   }
 
-  console.error('All invidious instances failed to resolve stream');
+  console.error('All piped instances failed to resolve stream, falling back to mock');
   return 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm';
 }
 
