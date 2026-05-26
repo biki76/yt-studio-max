@@ -16,6 +16,7 @@ async function resolveDynamicUrl(videoUrl: string, format: Format): Promise<stri
   
   const videoId = videoUrl.replace('DYNAMIC_FETCH_', '');
   
+  // 1. Try Piped API (Client-side, works on Github Pages)
   for (const instance of PIPED_INSTANCES) {
     try {
       const controller = new AbortController();
@@ -35,13 +36,25 @@ async function resolveDynamicUrl(videoUrl: string, format: Format): Promise<stri
           || data.videoStreams?.[0];
         if (combined) return combined.url;
       }
-      
     } catch (e) {
       console.error(`Failed resolving stream on ${instance}`, e);
     }
   }
 
-  console.error('All piped instances failed to resolve stream, falling back to mock');
+  // 2. Try Local API (Works if deployed with Express backend)
+  try {
+    const type = (format === 'MP3' || format === 'WAV') ? 'audio' : 'video';
+    const res = await fetch(`/api/resolve?v=${encodeURIComponent(videoId)}&type=${type}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) return data.url;
+    }
+  } catch (error) {
+    console.warn('Local API /api/resolve failed. Likely running on static hosting (like Github Pages).');
+  }
+
+  // 3. Fallback mock URL if all fail
+  console.error('All APIs failed to resolve stream, falling back to mock video');
   return 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm';
 }
 

@@ -38,23 +38,66 @@ async function fetchWithFallback(path: string) {
   throw lastErr;
 }
 
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.syncpundit.io',
+  'https://pipedapi.smarthome.yt',
+  'https://pi.ggtyler.dev',
+  'https://pipedapi.in.projectsegfau.lt'
+];
+
 export async function searchYouTube(query: string, sources: string[] = ['youtube']): Promise<any[]> {
   if (!query) return [];
 
   let results: any[] = [];
 
   if (sources.includes('youtube')) {
-    try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) {
-        throw new Error(`Status ${res.status}`);
+    let ytResults: any[] | null = null;
+    
+    // 1. Try Piped API (Client-side, works on Github Pages)
+    for (const instance of PIPED_INSTANCES) {
+      if (ytResults) break;
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=all`, { signal: controller.signal });
+        clearTimeout(id);
+        if (res.ok) {
+          const data = await res.json();
+          ytResults = data.items.filter((item: any) => item.type === 'stream').map((item: any) => ({
+            id: `yt-${item.url.split('v=')[1]}`,
+            videoId: item.url.split('v=')[1],
+            title: item.title,
+            thumbnail: item.thumbnail,
+            duration: formatSecondsToDuration(item.duration),
+            channelName: item.uploaderName,
+            videoUrl: `DYNAMIC_FETCH_${item.url.split('v=')[1]}`,
+            platform: 'youtube',
+            isMock: false
+          })).slice(0, 15);
+        }
+      } catch (err) {
+        // silently ignore and try next piped instance
       }
-      const data = await res.json();
-      results = [...results, ...data];
-    } catch (err) {
-      console.error('Failed to search youtube', err);
-      // Nice mock results instead of "Network Error"
-      const mockResults = Array.from({ length: 4 }).map((_, i) => ({
+    }
+
+    // 2. Try Local API (Works if deployed to Cloud Run with Express)
+    if (!ytResults) {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          ytResults = await res.json();
+        }
+      } catch (err) {
+        console.warn('Local API failed. Likely running on static hosting (like Github Pages) without backend.');
+      }
+    }
+
+    // 3. Fallback to mock data if all APIs fail
+    if (!ytResults) {
+      console.warn('All search APIs failed. Falling back to placeholder results.');
+      ytResults = Array.from({ length: 4 }).map((_, i) => ({
         id: `yt-mock-${Date.now()}-${i}`,
         videoId: `mock${i}`,
         title: `${query} Example Video ${i + 1}`,
@@ -65,8 +108,9 @@ export async function searchYouTube(query: string, sources: string[] = ['youtube
         platform: 'youtube',
         isMock: true
       }));
-      results = [...results, ...mockResults];
     }
+    
+    results = [...results, ...ytResults];
   }
 
   // Mock Vimeo results
