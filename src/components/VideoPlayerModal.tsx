@@ -24,12 +24,34 @@ export function VideoPlayerModal({ video, onClose }: VideoPlayerModalProps) {
           </button>
         </div>
         <div className="aspect-video bg-black relative">
-          <video 
-             src={video.videoUrl}
-             controls
-             className="w-full h-full object-contain"
-             autoPlay
-          />
+          {video.isMock ? (
+            <video 
+               src={video.videoUrl}
+               controls
+               className="w-full h-full object-contain"
+               autoPlay
+            />
+          ) : video.platform === 'vimeo' ? (
+             <iframe 
+               src={`https://player.vimeo.com/video/${video.videoId}?autoplay=1`}
+               className="w-full h-full border-0"
+               allow="autoplay; fullscreen; picture-in-picture"
+               allowFullScreen
+            />
+          ) : video.platform === 'twitch' ? (
+             <iframe 
+               src={`https://player.twitch.tv/?video=${video.videoId}&parent=${window.location.hostname}&autoplay=true`}
+               className="w-full h-full border-0"
+               allowFullScreen
+            />
+          ) : (
+            <iframe 
+               src={`https://www.youtube.com/embed/${video.videoId || video.id.replace('yt-', '')}?autoplay=1`}
+               className="w-full h-full border-0"
+               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+               allowFullScreen
+            />
+          )}
         </div>
       </div>
     </div>

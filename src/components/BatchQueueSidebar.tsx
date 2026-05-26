@@ -210,8 +210,10 @@ export function BatchQueueSidebar() {
       addToast('No finished items to clear', 'info');
       return;
     }
-    setBatchQueue(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'error'));
-    addToast('Cleared finished items', 'info');
+    if (window.confirm("Are you sure you want to clear all completed and failed items?")) {
+      setBatchQueue(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'error'));
+      addToast('Cleared finished items', 'info');
+    }
   };
 
   const handleShuffle = () => {
@@ -374,7 +376,7 @@ export function BatchQueueSidebar() {
         borderColor: isProcessing ? ['rgba(255, 255, 255, 0.1)', 'rgba(99, 102, 241, 0.5)', 'rgba(255, 255, 255, 0.1)'] : 'rgba(255, 255, 255, 0.05)'
       }}
       transition={isProcessing ? { duration: 2.5, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
-      className="w-full lg:w-[420px] xl:w-[480px] flex flex-col h-full bg-black/60 backdrop-blur-2xl shrink-0 border-l shadow-2xl relative z-20"
+      className="w-full lg:w-[420px] xl:w-[480px] flex flex-col min-h-screen lg:min-h-0 lg:h-full bg-black/60 backdrop-blur-2xl shrink-0 border-t lg:border-t-0 lg:border-l shadow-2xl relative z-20"
     >
       
       {/* Tabs / Header */}
@@ -451,7 +453,7 @@ export function BatchQueueSidebar() {
                    onClick={handleClearFinished}
                    disabled={isProcessing}
                    className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors disabled:opacity-50"
-                   title="Clear Finished"
+                   title="Clear All Completed"
                  >
                    <FilterX className="w-4 h-4" />
                  </button>
@@ -849,7 +851,7 @@ export function BatchQueueSidebar() {
       )}
 
       {/* Adsterra Slot */}
-      <div className="p-4 border-t border-white/5 flex justify-center bg-black/20">
+      <div className="p-4 border-t border-white/5 hidden xl:flex justify-center bg-black/20 shrink-0">
         <AdBanner type="300x250" />
       </div>
 
@@ -890,7 +892,12 @@ export function BatchQueueSidebar() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 relative">
+          {!isProcessing && batchQueue.length > 0 && (
+             <div className="absolute -top-6 left-0 right-0 flex justify-center pointer-events-none">
+                <span className="text-xs bg-indigo-500 text-white px-3 py-1 rounded-full shadow-lg shadow-indigo-500/20 animate-bounce">Select action below to process</span>
+             </div>
+          )}
           <button
             onClick={handleIndividualProcess}
             disabled={!loaded || batchQueue.length === 0 || isProcessing}
