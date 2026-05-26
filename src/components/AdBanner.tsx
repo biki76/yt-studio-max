@@ -8,32 +8,42 @@ export function AdBanner({ type }: AdBannerProps) {
   const adRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // In a real environment, we would inject the Adsterra script tag.
-    // For React SPA, we usually append the script dynamically if needed.
-    // E.g.,
-    /*
-    const script = document.createElement("script");
-    script.src = "//www.topcreativeformat.com/YOUR_ID/invoke.js";
+    const adWindow = window as any;
+    const [width, height] = type === '728x90' ? [728, 90] : [300, 250];
+
+    // Set up Adsterra options configuration
+    adWindow.atOptions = {
+      key: '63ce391a2385772566fc0d4160073389',
+      format: 'iframe',
+      height: height,
+      width: width,
+      params: {},
+    };
+
+    // Create and append the script tag dynamically
+    const script = document.createElement('script');
+    script.src = `//www.highperformanceformat.com/29405667/invoke.js`;
     script.async = true;
-    script.setAttribute("data-cfasync", "false");
+    script.setAttribute('data-cfasync', 'false');
+
     if (adRef.current) {
-        adRef.current.innerHTML = "";
-        adRef.current.appendChild(script);
+      adRef.current.innerHTML = ''; // Clear previous ad on type change
+      adRef.current.appendChild(script);
     }
-    */
+
+    return () => {
+      if (adRef.current) adRef.current.innerHTML = '';
+    };
   }, [type]);
 
-  const dimensions = type === '728x90' ? 'w-full max-w-[728px] h-auto min-h-[90px]' : 'w-full max-w-[300px] h-auto min-h-[250px]';
+  const dimensions = type === '728x90' 
+    ? 'w-full max-w-[728px] min-h-[90px]' 
+    : 'w-full max-w-[300px] min-h-[250px]';
 
   return (
     <div
       ref={adRef}
       className={`mx-auto bg-white/5 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden shrink-0 ${dimensions} max-w-full`}
-    >
-      <div className="text-white/30 text-sm font-mono flex flex-col items-center">
-        <span>Adsterra Placeholder</span>
-        <span>{type}</span>
-      </div>
-    </div>
+    />
   );
 }
