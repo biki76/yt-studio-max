@@ -20,6 +20,8 @@ interface AppContextType {
   setTheme: (t: 'deep-space' | 'midnight-indigo' | 'minimalist-light') => void;
   normalizeAudio: boolean;
   setNormalizeAudio: (n: boolean) => void;
+  hoverAutoplay: boolean;
+  setHoverAutoplay: (s: boolean) => void;
   soundEnabled: boolean;
   setSoundEnabled: (s: boolean) => void;
 }
@@ -66,9 +68,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return 'deep-space';
   });
 
+  const [hoverAutoplay, setHoverAutoplay] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ytsm_hoverAutoplay');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return false;
+  });
+
   useEffect(() => {
     localStorage.setItem('ytsm_history', JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem('ytsm_hoverAutoplay', JSON.stringify(hoverAutoplay));
+  }, [hoverAutoplay]);
 
   useEffect(() => {
     localStorage.setItem('ytsm_batch', JSON.stringify(batchQueue));
@@ -144,6 +158,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setQuality,
         normalizeAudio,
         setNormalizeAudio,
+        hoverAutoplay,
+        setHoverAutoplay,
         soundEnabled,
         setSoundEnabled,
         theme,
