@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Search, Youtube, Disc, Loader2, Palette, BookOpen, Twitch, Music, Video, Radio, X, Lock, ExternalLink } from 'lucide-react';
+import { Search, Youtube, Disc, Loader2, Palette, BookOpen, Twitch, Music, Video, Radio, X, Lock, ExternalLink, Play } from 'lucide-react';
 import { AppProvider, useAppContext } from './store/AppContext';
 import { BatchQueueSidebar } from './components/BatchQueueSidebar';
 import { SearchResult } from './components/SearchResult';
@@ -8,21 +8,22 @@ import { VideoPlayerModal } from './components/VideoPlayerModal';
 import { AdBanner } from './components/AdBanner';
 import { searchYouTube } from './lib/utils';
 import { VideoResult } from './types';
-import { SummaryDashboard } from './components/SummaryDashboard';
 import { UserManual } from './components/UserManual';
 import { PlatformFeed } from './components/PlatformFeed';
 
 import { ToastProvider } from './components/ToastProvider';
 
 function Dashboard() {
-  const { theme, setTheme } = useAppContext();
+  const { theme, setTheme, hoverAutoplay, setHoverAutoplay } = useAppContext();
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<VideoResult[]>([]);
+  const [searchSources, setSearchSources] = useState<string[]>(['youtube']);
   const [previewVideo, setPreviewVideo] = useState<VideoResult | null>(null);
   const [tipIndex, setTipIndex] = useState(0);
   const [showUserManual, setShowUserManual] = useState(false);
   const [activePlatformFeed, setActivePlatformFeed] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const tips = [
     "Quick Tip: Press Ctrl + Enter to quickly search.",
@@ -63,16 +64,21 @@ function Dashboard() {
     e.preventDefault();
     if (!query.trim()) return;
     setIsSearching(true);
-    const res = await searchYouTube(query);
+    const res = await searchYouTube(query, searchSources);
     setResults(res);
     setIsSearching(false);
+    
+    // Smooth scroll to top of results grid after a brief delay for rendering
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-black text-white overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen bg-black text-white lg:overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-indigo-200 overflow-y-auto">
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-black to-black">
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0 lg:h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-black to-black min-w-0">
         {activePlatformFeed ? (
           <PlatformFeed
             platform={activePlatformFeed}
@@ -94,7 +100,7 @@ function Dashboard() {
                 </h1>
                 <span className="text-xs font-semibold text-indigo-400/80 uppercase tracking-widest flex items-center gap-1.5 hover:text-indigo-300 transition-colors">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                  Crafted specially for Shimanto & Rabbi
+                  Media Operations Workspace
                 </span>
               </div>
             </div>
@@ -108,6 +114,20 @@ function Dashboard() {
                 Manual
               </button>
               <button 
+                onClick={() => setHoverAutoplay(!hoverAutoplay)}
+                className={`flex items-center justify-center p-2.5 rounded-full border transition-all font-medium ${hoverAutoplay ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-300' : 'border-white/10 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80'}`}
+                title={hoverAutoplay ? "Hover Autoplay: ON" : "Hover Autoplay: OFF"}
+              >
+                <div className="relative">
+                  <Play className="w-4 h-4" />
+                  {!hoverAutoplay && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-[20px] h-[2px] bg-white/80 rotate-45" />
+                    </div>
+                  )}
+                </div>
+              </button>
+              <button 
                 onClick={() => setTheme(theme === 'minimalist-light' ? 'deep-space' : 'minimalist-light')} 
                 className="flex items-center justify-center p-2.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-all font-medium"
                 title="Toggle Theme"
@@ -117,24 +137,74 @@ function Dashboard() {
             </div>
           </div>
 
-          <form id="search-form" onSubmit={handleSearch} className="relative max-w-3xl mx-auto transform transition-all hover:scale-[1.01]">
-            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-indigo-400" />
+          <form id="search-form" onSubmit={handleSearch} className="relative max-w-3xl mx-auto transform transition-all hover:scale-[1.01] flex flex-col gap-3">
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-indigo-400" />
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 rounded-2xl py-4 flex-1 pl-14 pr-36 text-lg text-white placeholder-white/40 transition-all backdrop-blur-md outline-none"
+                placeholder="Search across platforms or paste a link..."
+              />
+              <button 
+                type="submit"
+                disabled={isSearching || !query.trim()}
+                className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white px-8 rounded-xl font-medium transition-all shadow-md shadow-indigo-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed group z-10"
+              >
+                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="group-hover:translate-x-0.5 transition-transform">Search</span>}
+              </button>
             </div>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 rounded-2xl py-4 flex-1 pl-14 pr-36 text-lg text-white placeholder-white/40 transition-all backdrop-blur-md outline-none"
-              placeholder="Search YouTube or paste a link..."
-            />
-            <button 
-              type="submit"
-              disabled={isSearching || !query.trim()}
-              className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white px-8 rounded-xl font-medium transition-all shadow-md shadow-indigo-500/20 flex items-center disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="group-hover:translate-x-0.5 transition-transform">Search</span>}
-            </button>
+            
+            <div className="flex items-center justify-center gap-6 mt-2 text-sm text-white/70">
+              <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={searchSources.includes('youtube')} 
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSearchSources([...searchSources, 'youtube']);
+                    } else if (searchSources.length > 1) {
+                      setSearchSources(searchSources.filter(s => s !== 'youtube'));
+                    }
+                  }} 
+                  className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/50"
+                />
+                <Youtube className="w-4 h-4" /> YouTube
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={searchSources.includes('vimeo')} 
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSearchSources([...searchSources, 'vimeo']);
+                    } else if (searchSources.length > 1) {
+                      setSearchSources(searchSources.filter(s => s !== 'vimeo'));
+                    }
+                  }} 
+                  className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/50"
+                />
+                <Video className="w-4 h-4" /> Vimeo
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={searchSources.includes('twitch')} 
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSearchSources([...searchSources, 'twitch']);
+                    } else if (searchSources.length > 1) {
+                      setSearchSources(searchSources.filter(s => s !== 'twitch'));
+                    }
+                  }} 
+                  className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/50"
+                />
+                <Twitch className="w-4 h-4" /> Twitch
+              </label>
+            </div>
           </form>
 
           {/* Supported Platforms */}
@@ -189,7 +259,6 @@ function Dashboard() {
 
         {/* Results Area */}
         <main className="flex-1 overflow-y-auto p-8 custom-scrollbar relative">
-          <SummaryDashboard />
           {results.length === 0 && !isSearching && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
@@ -226,7 +295,7 @@ function Dashboard() {
           )}
 
               {results.length > 0 && (
-                <div className="max-w-[1600px] mx-auto">
+                <div ref={resultsRef} className="max-w-[1600px] mx-auto pt-8">
                   <div className="mb-6 flex items-center justify-between">
                     <h3 className="text-lg font-medium text-white/90">Search Results</h3>
                     <span className="text-sm text-white/50">{results.length} found</span>
@@ -244,8 +313,9 @@ function Dashboard() {
                 </div>
               )}
               
-              <div className="mt-8 text-center pb-8 opacity-70 text-sm font-medium tracking-wide">
-                Crafted by <a href="https://www.facebook.com/biki76" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-widest font-semibold ml-1">Biki Akram</a>
+              <div className="mt-8 text-center pb-8 opacity-30 hover:opacity-100 transition-opacity text-xs tracking-wider flex flex-col items-center gap-1">
+                <div>Crafted by <a href="https://www.facebook.com/biki76" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Biki Akram</a></div>
+                <div className="text-[10px] font-mono opacity-50">craftedSpeciallyForShimanto&Rabbi</div>
               </div>
             </main>
           </>

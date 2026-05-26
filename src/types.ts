@@ -1,10 +1,13 @@
 export interface VideoResult {
-  id: string;
+  id: string; // The unique id across platforms (e.g. yt-1234)
+  videoId?: string; // The platform-specific id
   title: string;
   thumbnail: string;
   duration: string;
   channelName: string;
   videoUrl: string; // The simulated or real raw video url that we can fetch
+  platform?: 'youtube' | 'vimeo' | 'twitch';
+  isMock?: boolean;
 }
 
 export interface HistoryItem {
