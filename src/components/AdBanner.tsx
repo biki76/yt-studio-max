@@ -1,44 +1,38 @@
 import React, { useEffect, useRef } from 'react';
 
-interface AdBannerProps {
-  type: '728x90' | '300x250';
-}
-
-export function AdBanner({ type }: AdBannerProps) {
+export function AdBanner() {
   const adRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const adWindow = window as any;
-    const [width, height] = type === '728x90' ? [728, 90] : [300, 250];
+    const [width, height] = [728, 90];
 
-    // Set up Adsterra options configuration
+    // Set up Adsterra options configuration with your new key
     adWindow.atOptions = {
-      key: '63ce391a2385772566fc0d4160073389',
+      key: '5cfe7365609efaca5715e6f4ef5b729e',
       format: 'iframe',
       height: height,
       width: width,
       params: {},
     };
 
-    // Create and append the script tag dynamically
+    // Create and append your specific script tag dynamically
     const script = document.createElement('script');
-    script.src = `//www.highperformanceformat.com/29405667/invoke.js`;
+    script.src = 'https://elementalconsessionconsession.com/5cfe7365609efaca5715e6f4ef5b729e/invoke.js';
     script.async = true;
     script.setAttribute('data-cfasync', 'false');
 
     if (adRef.current) {
-      adRef.current.innerHTML = ''; // Clear previous ad on type change
+      adRef.current.innerHTML = ''; // Clear previous ad container contents
       adRef.current.appendChild(script);
     }
 
     return () => {
       if (adRef.current) adRef.current.innerHTML = '';
     };
-  }, [type]);
+  }, []);
 
-  const dimensions = type === '728x90' 
-    ? 'w-full max-w-[728px] min-h-[90px]' 
-    : 'w-full max-w-[300px] min-h-[250px]';
+  const dimensions = 'w-full max-w-[728px] min-h-[90px]';
 
   return (
     <div
